@@ -113,9 +113,9 @@ export default function Generator() {
         setDocId(docRef.id);
         alert('تم حفظ البيانات بنجاح!');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert('حدث خطأ أثناء الحفظ. يرجى التأكد من إعدادات قاعدة البيانات.');
+      alert('حدث خطأ أثناء الحفظ: ' + (e.message || 'تأكد من تفعيل Firestore وتحديث قواعد الأمان (Security Rules) لتسمح بالكتابة.'));
     }
     setIsSaving(false);
   };

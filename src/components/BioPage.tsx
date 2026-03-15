@@ -1,5 +1,5 @@
 import { useSearchParams, Link, useParams } from 'react-router-dom';
-import { Facebook, Instagram, MessageCircle, Globe, ArrowRight, Loader2 } from 'lucide-react';
+import { Facebook, Instagram, MessageCircle, Globe, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -15,6 +15,7 @@ export default function BioPage() {
     web: searchParams.get('web') || ''
   });
   const [loading, setLoading] = useState(!!id);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -29,17 +30,30 @@ export default function BioPage() {
               wa: data.wa || '',
               web: data.web || ''
             });
+          } else {
+            setError('لم يتم العثور على البيانات. قد يكون الرابط غير صحيح أو تم حذفه.');
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error("Error fetching links:", e);
+          setError('خطأ في قاعدة البيانات: ' + (e.message || 'تأكد من تفعيل Firestore وصلاحيات القراءة.'));
         }
         setLoading(false);
       };
       fetchLinks();
+    } else {
+      // Sync with search params if no ID is provided
+      setLinks({
+        fb: searchParams.get('fb') || '',
+        ig: searchParams.get('ig') || '',
+        wa: searchParams.get('wa') || '',
+        web: searchParams.get('web') || ''
+      });
+      setLoading(false);
     }
-  }, [id]);
+  }, [id, searchParams]);
 
   const { fb, ig, wa, web } = links;
+  const hasLinks = fb || ig || wa || web;
 
   const getWhatsAppLink = (number: string) => {
     const cleanNumber = number.replace(/\D/g, '');
@@ -82,6 +96,20 @@ export default function BioPage() {
         <p className="text-lg text-gray-700 mb-10 text-center font-medium">
           لأرقى الموديلات والأزياء الحديثة
         </p>
+
+        {error && (
+          <div className="w-full bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6 flex items-start gap-3">
+            <AlertCircle className="shrink-0 mt-0.5" size={20} />
+            <p className="text-sm font-medium">{error}</p>
+          </div>
+        )}
+
+        {!hasLinks && !error && (
+          <div className="w-full bg-orange-50 border border-orange-200 text-orange-700 p-4 rounded-xl mb-6 flex items-center justify-center gap-3">
+            <AlertCircle size={20} />
+            <p className="text-sm font-medium">لا توجد روابط لعرضها حالياً</p>
+          </div>
+        )}
 
         <div className="w-full space-y-4">
           {ig && (
