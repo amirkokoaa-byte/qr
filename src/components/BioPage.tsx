@@ -1,17 +1,59 @@
-import { useSearchParams, Link } from 'react-router-dom';
-import { Facebook, Instagram, MessageCircle, Globe, ArrowRight } from 'lucide-react';
+import { useSearchParams, Link, useParams } from 'react-router-dom';
+import { Facebook, Instagram, MessageCircle, Globe, ArrowRight, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function BioPage() {
+  const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const fb = searchParams.get('fb');
-  const ig = searchParams.get('ig');
-  const wa = searchParams.get('wa');
-  const web = searchParams.get('web');
+  
+  const [links, setLinks] = useState({
+    fb: searchParams.get('fb') || '',
+    ig: searchParams.get('ig') || '',
+    wa: searchParams.get('wa') || '',
+    web: searchParams.get('web') || ''
+  });
+  const [loading, setLoading] = useState(!!id);
+
+  useEffect(() => {
+    if (id) {
+      const fetchLinks = async () => {
+        try {
+          const docSnap = await getDoc(doc(db, 'links', id));
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setLinks({
+              fb: data.fb || '',
+              ig: data.ig || '',
+              wa: data.wa || '',
+              web: data.web || ''
+            });
+          }
+        } catch (e) {
+          console.error("Error fetching links:", e);
+        }
+        setLoading(false);
+      };
+      fetchLinks();
+    }
+  }, [id]);
+
+  const { fb, ig, wa, web } = links;
 
   const getWhatsAppLink = (number: string) => {
     const cleanNumber = number.replace(/\D/g, '');
     return `https://wa.me/${cleanNumber}`;
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#fdfbf7] flex flex-col items-center justify-center">
+        <Loader2 className="w-12 h-12 text-gray-400 animate-spin mb-4" />
+        <p className="text-gray-500 font-medium">جاري تحميل الروابط...</p>
+      </div>
+    );
+  }
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#fdfbf7] flex flex-col items-center py-16 px-6 relative overflow-hidden">

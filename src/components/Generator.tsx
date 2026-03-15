@@ -1,7 +1,9 @@
 import { useState, useRef } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { Download, Link as LinkIcon, Facebook, Instagram, MessageCircle, Globe, QrCode, Image as ImageIcon, Palette } from 'lucide-react';
+import { Download, Link as LinkIcon, Facebook, Instagram, MessageCircle, Globe, QrCode, Image as ImageIcon, Palette, Save, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function Generator() {
   const [fb, setFb] = useState('');
@@ -14,33 +16,63 @@ export default function Generator() {
   const [bgColor, setBgColor] = useState('#ffffff');
   const [fgColor, setFgColor] = useState('#000000');
 
+  const [docId, setDocId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
   const qrRef = useRef<HTMLDivElement>(null);
 
+  const formatUrl = (url: string) => {
+    if (!url) return '';
+    if (!/^https?:\/\//i.test(url)) {
+      return `https://${url}`;
+    }
+    return url;
+  };
+
   const getUrls = () => {
-    const baseUrl = window.location.origin;
+    const baseUrl = window.location.origin + window.location.pathname.replace(/\/$/, '');
     let relativeUrl = '';
+    let absoluteUrl = '';
     
     switch (qrMode) {
-      case 'fb': relativeUrl = fb; break;
-      case 'ig': relativeUrl = ig; break;
-      case 'wa': relativeUrl = wa ? `https://wa.me/${wa.replace(/\D/g, '')}` : ''; break;
-      case 'web': relativeUrl = web; break;
+      case 'fb': 
+        absoluteUrl = formatUrl(fb); 
+        relativeUrl = formatUrl(fb); 
+        break;
+      case 'ig': 
+        absoluteUrl = formatUrl(ig); 
+        relativeUrl = formatUrl(ig); 
+        break;
+      case 'wa': 
+        const waUrl = wa ? `https://wa.me/${wa.replace(/\D/g, '')}` : '';
+        absoluteUrl = waUrl; 
+        relativeUrl = waUrl; 
+        break;
+      case 'web': 
+        absoluteUrl = formatUrl(web); 
+        relativeUrl = formatUrl(web); 
+        break;
       case 'combined':
       default:
-        const params = new URLSearchParams();
-        if (fb) params.append('fb', fb);
-        if (ig) params.append('ig', ig);
-        if (wa) params.append('wa', wa);
-        if (web) params.append('web', web);
-        
-        if (!fb && !ig && !wa && !web) return { absolute: '', relative: '' };
-        relativeUrl = `/bio?${params.toString()}`;
+        if (!docId) {
+          const params = new URLSearchParams();
+          if (fb) params.append('fb', formatUrl(fb));
+          if (ig) params.append('ig', formatUrl(ig));
+          if (wa) params.append('wa', wa);
+          if (web) params.append('web', formatUrl(web));
+          
+          if (!fb && !ig && !wa && !web) return { absolute: '', relative: '' };
+          relativeUrl = `/bio?${params.toString()}`;
+          absoluteUrl = `${baseUrl}/#/bio?${params.toString()}`;
+        } else {
+          relativeUrl = `/bio/${docId}`;
+          absoluteUrl = `${baseUrl}/#/bio/${docId}`;
+        }
         break;
     }
     
-    const isExternal = qrMode !== 'combined';
     return {
-      absolute: isExternal ? relativeUrl : `${baseUrl}${relativeUrl}`,
+      absolute: absoluteUrl,
       relative: relativeUrl
     };
   };
@@ -53,6 +85,39 @@ export default function Generator() {
       const url = URL.createObjectURL(file);
       setLogoUrl(url);
     }
+  };
+
+  const saveLinks = async () => {
+    if (!fb && !ig && !wa && !web) {
+      alert('الرجاء إدخال رابط واحد على الأقل');
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const data = {
+        fb: formatUrl(fb),
+        ig: formatUrl(ig),
+        wa: wa,
+        web: formatUrl(web)
+      };
+
+      if (docId) {
+        await updateDoc(doc(db, 'links', docId), data);
+        alert('تم تحديث البيانات بنجاح!');
+      } else {
+        const docRef = await addDoc(collection(db, 'links'), {
+          ...data,
+          createdAt: new Date()
+        });
+        setDocId(docRef.id);
+        alert('تم حفظ البيانات بنجاح!');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('حدث خطأ أثناء الحفظ. يرجى التأكد من إعدادات قاعدة البيانات.');
+    }
+    setIsSaving(false);
   };
 
   const downloadQR = () => {
@@ -144,6 +209,24 @@ export default function Generator() {
                   dir="ltr"
                 />
               </div>
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={saveLinks}
+                disabled={isSaving}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+              >
+                {isSaving ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <Save size={20} />
+                )}
+                {docId ? 'تحديث البيانات في السحابة' : 'حفظ البيانات في السحابة'}
+              </button>
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                احفظ البيانات للحصول على رابط QR قصير ونظيف
+              </p>
             </div>
 
             {/* Customization Section */}
